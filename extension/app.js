@@ -285,6 +285,28 @@ async function dismissSavedTab(id) {
 
 
 /* ----------------------------------------------------------------
+   SHORTCUTS — Storage helpers
+   ---------------------------------------------------------------- */
+
+async function getShortcuts() {
+  const { shortcuts = [] } = await chrome.storage.local.get('shortcuts');
+  return shortcuts;
+}
+
+async function addShortcut({ title, url }) {
+  const shortcuts = await getShortcuts();
+  shortcuts.push({ id: Date.now().toString(), title: title.trim(), url: url.trim() });
+  await chrome.storage.local.set({ shortcuts });
+}
+
+async function removeShortcut(id) {
+  let shortcuts = await getShortcuts();
+  shortcuts = shortcuts.filter(s => s.id !== id);
+  await chrome.storage.local.set({ shortcuts });
+}
+
+
+/* ----------------------------------------------------------------
    UI HELPERS
    ---------------------------------------------------------------- */
 
@@ -957,6 +979,68 @@ async function renderDeferredColumn() {
   }
 }
 
+
+/* ----------------------------------------------------------------
+   SHORTCUTS — Render
+   ---------------------------------------------------------------- */
+
+async function renderShortcutsBar() {
+  const bar = document.getElementById('shortcutsBar');
+  if (!bar) return;
+
+  const shortcuts = await getShortcuts();
+
+  const chips = shortcuts.map(s => {
+    const safeUrl   = (s.url   || '').replace(/"/g, '&quot;');
+    const safeTitle = (s.title || '').replace(/"/g, '&quot;');
+    let favicon = '';
+    try { favicon = `https://www.google.com/s2/favicons?domain=${new URL(s.url).hostname}&sz=32`; } catch {}
+    return `<button class="shortcut-chip" data-action="open-shortcut" data-url="${safeUrl}" title="${safeUrl}">
+      ${favicon ? `<img class="shortcut-favicon" src="${favicon}" width="14" height="14" alt="" onerror="this.style.display='none'">` : ''}
+      <span class="shortcut-label">${safeTitle}</span>
+      <span class="shortcut-delete" data-action="delete-shortcut" data-id="${s.id}" title="Remove shortcut">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" width="10" height="10"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+      </span>
+    </button>`;
+  }).join('');
+
+  const addBtn = `<button class="add-shortcut-btn" data-action="add-shortcut-start">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" width="12" height="12"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+    Add shortcut
+  </button>`;
+
+  bar.innerHTML = chips + addBtn;
+}
+
+function showShortcutAddForm() {
+  const bar = document.getElementById('shortcutsBar');
+  if (!bar) return;
+  bar.querySelector('.add-shortcut-btn')?.remove();
+  bar.insertAdjacentHTML('beforeend', `
+    <div class="shortcut-add-form">
+      <input id="shortcutTitleInput" class="shortcut-input" type="text" placeholder="Name (optional)" maxlength="40" autocomplete="off">
+      <input id="shortcutUrlInput" class="shortcut-input" type="url" placeholder="https://..." autocomplete="off">
+      <button class="shortcut-save-btn" data-action="add-shortcut-save">Add</button>
+      <button class="shortcut-cancel-btn" data-action="add-shortcut-cancel">Cancel</button>
+    </div>`);
+  document.getElementById('shortcutUrlInput')?.focus();
+}
+
+async function handleSaveShortcut() {
+  const urlInput   = document.getElementById('shortcutUrlInput');
+  const titleInput = document.getElementById('shortcutTitleInput');
+  let url = (urlInput?.value || '').trim();
+  if (!url) { urlInput?.focus(); return; }
+  if (!url.startsWith('http')) url = 'https://' + url;
+  let title = (titleInput?.value || '').trim();
+  if (!title) {
+    try { title = friendlyDomain(new URL(url).hostname); } catch { title = url; }
+  }
+  await addShortcut({ title, url });
+  await renderShortcutsBar();
+}
+
+
 /**
  * renderDeferredItem(item)
  *
@@ -1164,7 +1248,8 @@ async function renderStaticDashboard() {
   // --- Check for duplicate Tab Out tabs ---
   checkTabOutDupes();
 
-  // --- Render "Saved for Later" column ---
+  // --- Render shortcuts bar and "Saved for Later" column ---
+  await renderShortcutsBar();
   await renderDeferredColumn();
 }
 
@@ -1187,6 +1272,32 @@ document.addEventListener('click', async (e) => {
   if (!actionEl) return;
 
   const action = actionEl.dataset.action;
+
+  // ---- Shortcuts ----
+  if (action === 'open-shortcut') {
+    e.stopPropagation();
+    const url = actionEl.dataset.url;
+    if (url) window.open(url, '_blank');
+    return;
+  }
+  if (action === 'delete-shortcut') {
+    e.stopPropagation();
+    await removeShortcut(actionEl.dataset.id);
+    await renderShortcutsBar();
+    return;
+  }
+  if (action === 'add-shortcut-start') {
+    showShortcutAddForm();
+    return;
+  }
+  if (action === 'add-shortcut-save') {
+    await handleSaveShortcut();
+    return;
+  }
+  if (action === 'add-shortcut-cancel') {
+    await renderShortcutsBar();
+    return;
+  }
 
   // ---- Close duplicate Tab Out tabs ----
   if (action === 'close-tabout-dupes') {
@@ -1472,6 +1583,19 @@ document.addEventListener('input', async (e) => {
       || '<div style="font-size:12px;color:var(--muted);padding:8px 0">No results</div>';
   } catch (err) {
     console.warn('[tab-out] Archive search failed:', err);
+  }
+});
+
+
+// ---- Shortcut add form — submit on Enter, cancel on Escape ----
+document.addEventListener('keydown', async (e) => {
+  if (!e.target.classList.contains('shortcut-input')) return;
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    await handleSaveShortcut();
+  }
+  if (e.key === 'Escape') {
+    await renderShortcutsBar();
   }
 });
 
