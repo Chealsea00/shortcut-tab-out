@@ -8,15 +8,24 @@ No server. No account. No external API calls. Just a Chrome extension.
 
 ---
 
-## Install with a coding agent
+## Install
 
-Send your coding agent (Claude Code, Codex, etc.) this repo and say **"install this"**:
+**1. Clone the repo**
 
+```bash
+git clone https://github.com/Chealsea00/shortcut-tab-out.git
 ```
-https://github.com/zarazhangrui/tab-out
-```
 
-The agent will walk you through it. Takes about 1 minute.
+**2. Load the Chrome extension**
+
+1. Open Chrome and go to `chrome://extensions`
+2. Enable **Developer mode** (top-right toggle)
+3. Click **Load unpacked**
+4. Navigate to the `extension/` folder inside the cloned repo and select it
+
+**3. Open a new tab**
+
+You'll see Tab Out.
 
 ---
 
@@ -32,27 +41,6 @@ The agent will walk you through it. Takes about 1 minute.
 - **Expandable groups** show the first 8 tabs with a clickable "+N more"
 - **100% local** your data never leaves your machine
 - **Pure Chrome extension** no server, no Node.js, no npm, no setup beyond loading the extension
-
----
-
-## Manual Setup
-
-**1. Clone the repo**
-
-```bash
-git clone https://github.com/zarazhangrui/tab-out.git
-```
-
-**2. Load the Chrome extension**
-
-1. Open Chrome and go to `chrome://extensions`
-2. Enable **Developer mode** (top-right toggle)
-3. Click **Load unpacked**
-4. Navigate to the `extension/` folder inside the cloned repo and select it
-
-**3. Open a new tab**
-
-You'll see Tab Out.
 
 ---
 
@@ -88,4 +76,4 @@ MIT
 
 ---
 
-Built by [Zara](https://x.com/zarazhangrui)
+Built by [Chealsea](https://github.com/Chealsea00)
